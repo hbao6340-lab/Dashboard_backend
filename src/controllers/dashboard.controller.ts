@@ -88,12 +88,12 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
   // Get category names for chart
   const categoryIds = tasksByCategory.map((t: { categoryId: string | null }) => t.categoryId).filter(Boolean) as string[]
   const categories = await prisma.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, name: true, color: true } })
-  const categoryMap = new Map(categories.map((c: { id: string; name: string; color: string }) => [c.id, c]))
+  const categoryMap = new Map<string, { name: string; color: string }>(categories.map(c => [c.id, { name: c.name, color: c.color }]))
 
   // Get user names for workload
   const userIds = userWorkload.map((u: { userId: string }) => u.userId)
   const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } })
-  const userMap = new Map(users.map((u: { id: string; fullName: string }) => [u.id, u.fullName]))
+  const userMap = new Map<string, string>(users.map(u => [u.id, u.fullName]))
 
   res.json({
     success: true,

@@ -1,15 +1,16 @@
 // Audit Logging Middleware
 import { Request, Response, NextFunction } from 'express'
-import { Prisma } from '@prisma/client'
 import prisma from '../config/prisma.js'
 import { AuthenticatedRequest } from './auth.js'
+
+type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[]
 
 interface AuditLogData {
   userId?: string
   action: string
   targetType: string
   targetId?: string
-  metadata?: Prisma.InputJsonValue
+  metadata?: JsonValue
   ipAddress?: string
   userAgent?: string
 }
@@ -22,7 +23,7 @@ export const createAuditLog = async (data: AuditLogData) => {
         action: data.action as any,
         targetType: data.targetType,
         targetId: data.targetId,
-        metadata: data.metadata ?? Prisma.DbNull,
+        metadata: data.metadata as any,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       },
@@ -38,7 +39,7 @@ export const auditMiddleware = (
   action: string,
   targetType: string,
   getTargetId?: (req: Request) => string | undefined,
-  getMetadata?: (req: Request, res: Response) => Prisma.InputJsonValue
+  getMetadata?: (req: Request, res: Response) => JsonValue
 ) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     // Store original send to capture response
@@ -79,7 +80,7 @@ export const audit = {
       action: success ? 'LOGIN' : 'FAILED_LOGIN',
       targetType: 'USER',
       targetId: req.user?.id,
-      metadata: metadata as Prisma.InputJsonValue,
+      metadata: metadata as JsonValue,
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
     }),
@@ -100,7 +101,7 @@ export const audit = {
       action: 'USER_CREATED',
       targetType: 'USER',
       targetId,
-      metadata: metadata as Prisma.InputJsonValue,
+      metadata: metadata as JsonValue,
       ipAddress: req?.ip,
       userAgent: req?.get('user-agent'),
     }),
@@ -111,7 +112,7 @@ export const audit = {
       action: 'USER_MODIFIED',
       targetType: 'USER',
       targetId,
-      metadata: { changes } as Prisma.InputJsonValue,
+      metadata: { changes } as JsonValue,
       ipAddress: req?.ip,
       userAgent: req?.get('user-agent'),
     }),
@@ -132,7 +133,7 @@ export const audit = {
       action: 'ROLE_CHANGED',
       targetType: 'USER',
       targetId,
-      metadata: { oldRole, newRole } as Prisma.InputJsonValue,
+      metadata: { oldRole, newRole } as JsonValue,
       ipAddress: req?.ip,
       userAgent: req?.get('user-agent'),
     }),
@@ -143,7 +144,7 @@ export const audit = {
       action: 'DOCUMENT_UPLOADED',
       targetType: 'DOCUMENT',
       targetId: documentId,
-      metadata: metadata as Prisma.InputJsonValue,
+      metadata: metadata as JsonValue,
       ipAddress: req?.ip,
       userAgent: req?.get('user-agent'),
     }),
@@ -164,7 +165,7 @@ export const audit = {
       action: 'TASK_CREATED',
       targetType: 'TASK',
       targetId: taskId,
-      metadata: metadata as Prisma.InputJsonValue,
+      metadata: metadata as JsonValue,
       ipAddress: req?.ip,
       userAgent: req?.get('user-agent'),
     }),
