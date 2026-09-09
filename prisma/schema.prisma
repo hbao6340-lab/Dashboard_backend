@@ -1,0 +1,732 @@
+// Prisma Schema for E-Office Document Management & Administration System
+// This schema supports all requirements from the master prompt
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  DEVELOPER
+  ADMINISTRATOR
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  DISABLED
+}
+
+enum DocumentStatus {
+  DRAFT
+  SUBMITTED
+  ACTIVE
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+enum DocumentType {
+  PDF
+  DOC
+  DOCX
+  XLS
+  XLSX
+  PPT
+  PPTX
+  TXT
+  JPG
+  JPEG
+  PNG
+  ZIP
+  OTHER
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  ASSIGNED
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum ReportType {
+  TASK_SPECIFIC
+  MONTHLY
+  GENERAL
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  REVISION_REQUESTED
+  APPROVED
+  REJECTED
+  FINALIZED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  DOCUMENT_ASSIGNED
+  DEADLINE_APPROACHING
+  TASK_OVERDUE
+  TASK_COMPLETED
+  REPORT_SUBMITTED
+  REPORT_REJECTED
+  REVISION_REQUESTED
+  REPORT_APPROVED
+  ACCOUNT_CHANGED
+  ADMIN_ANNOUNCEMENT
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  FAILED_LOGIN
+  USER_CREATED
+  USER_MODIFIED
+  PASSWORD_RESET
+  ROLE_CHANGED
+  USER_DISABLED
+  USER_ENABLED
+  DOCUMENT_UPLOADED
+  DOCUMENT_DOWNLOADED
+  DOCUMENT_MODIFIED
+  DOCUMENT_ARCHIVED
+  DOCUMENT_VERSION_CREATED
+  TASK_CREATED
+  TASK_ASSIGNED
+  TASK_MODIFIED
+  TASK_COMPLETED
+  TASK_PROGRESS_UPDATED
+  REPORT_SUBMITTED
+  REPORT_REVIEWED
+  REPORT_APPROVED
+  REPORT_REJECTED
+  REPORT_REVISION_REQUESTED
+  SETTINGS_MODIFIED
+  CATEGORY_CREATED
+  CATEGORY_MODIFIED
+  TAG_CREATED
+  TAG_MODIFIED
+}
+
+// ============================================
+// CORE MODELS
+// ============================================
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique
+  email         String    @unique
+  passwordHash  String
+  fullName      String
+  role          UserRole  @default(USER)
+  status        UserStatus @default(ACTIVE)
+  departmentId  String?
+  position      String?
+  phone         String?
+  avatarUrl     String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  // Relations
+  department    Department?       @relation(fields: [departmentId], references: [id])
+  createdBy     User?             @relation("UserCreatedBy", fields: [createdById], references: [id])
+  createdById   String?
+  createdUsers  User[]            @relation("UserCreatedBy")
+  updatedBy     User?             @relation("UserUpdatedBy", fields: [updatedById], references: [id])
+  updatedById   String?
+  updatedUsers  User[]            @relation("UserUpdatedBy")
+
+  documents         Document[]          @relation("DocumentUploader")
+  documentVersions  DocumentVersion[]   @relation("DocumentVersionUploader")
+  documentAssignments DocumentAssignment[] @relation("DocumentAssignee")
+  documentAssignedBy  DocumentAssignment[] @relation("DocumentAssignedBy")
+  tasksCreated      Task[]              @relation("TaskCreator")
+  tasksAssigned     TaskAssignment[]    @relation("TaskAssignee")
+  taskAssignedBy    TaskAssignment[]    @relation("TaskAssignedBy")
+  taskProgress      TaskProgress[]      @relation("TaskProgressUser")
+  taskComments      TaskComment[]       @relation("TaskCommentUser")
+  taskAttachments   TaskAttachment[]    @relation("TaskAttachmentUploader")
+  reportsSubmitted  Report[]            @relation("ReportAuthor")
+  reportsReviewed   ReportReview[]      @relation("ReportReviewer")
+  reportAttachments ReportAttachment[]  @relation("ReportAttachmentUploader")
+  notifications     Notification[]      @relation("NotificationUser")
+  auditLogs         AuditLog[]          @relation("AuditLogUser")
+  calendarEvents    CalendarEvent[]     @relation("CalendarEventUser")
+  sessions          Session[]
+  updatedSettings   SystemSetting[]     @relation("SystemSettingUpdatedBy")
+
+  @@index([email])
+  @@index([username])
+  @@index([role])
+  @@index([status])
+  @@index([departmentId])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  parentId    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent      Department?    @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children    Department[]   @relation("DepartmentHierarchy")
+  users       User[]
+  tasks       Task[]
+
+  @@index([code])
+  @@index([parentId])
+  @@map("departments")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#3B82F6")
+  icon        String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documents   Document[]
+  tasks       Task[]
+  reports     Report[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("categories")
+}
+
+model Tag {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#6B7280")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documents   DocumentTag[]
+  tasks       TaskTag[]
+  reports     ReportTag[]
+
+  @@index([isActive])
+  @@map("tags")
+}
+
+model DocumentTag {
+  documentId String
+  tagId      String
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, tagId])
+  @@map("document_tags")
+}
+
+model TaskTag {
+  taskId    String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+  @@map("task_tags")
+}
+
+model ReportTag {
+  reportId  String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([reportId, tagId])
+  @@map("report_tags")
+}
+
+// ============================================
+// DOCUMENT MODELS
+// ============================================
+
+model Document {
+  id              String         @id @default(uuid())
+  documentNumber  String         @unique
+  title           String
+  description     String?
+  type            DocumentType
+  categoryId      String?
+  status          DocumentStatus @default(DRAFT)
+  version         Int            @default(1)
+  fileSize        BigInt
+  mimeType        String
+  filePath        String
+  originalName    String
+  confidentiality String         @default("INTERNAL")
+  uploadedById    String
+  relatedTaskId   String?        @unique
+  relatedReportId String?        @unique
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  category        Category?           @relation(fields: [categoryId], references: [id])
+  uploadedBy      User                @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  relatedTask     Task?               @relation("TaskDocument")
+  relatedReport   Report?             @relation("ReportDocument")
+  versions        DocumentVersion[]
+  assignments     DocumentAssignment[]
+  tags            DocumentTag[]
+
+  @@index([documentNumber])
+  @@index([categoryId])
+  @@index([status])
+  @@index([uploadedById])
+  @@index([relatedTaskId])
+  @@index([createdAt])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id              String   @id @default(uuid())
+  documentId      String
+  version         Int
+  fileSize        BigInt
+  mimeType        String
+  filePath        String
+  originalName    String
+  changeNotes     String?
+  uploadedById    String
+  createdAt       DateTime @default(now())
+
+  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploadedBy      User     @relation("DocumentVersionUploader", fields: [uploadedById], references: [id])
+
+  @@unique([documentId, version])
+  @@index([documentId])
+  @@index([uploadedById])
+  @@map("document_versions")
+}
+
+model DocumentAssignment {
+  id              String   @id @default(uuid())
+  documentId      String
+  userId          String
+  responsibility  String?
+  instructions    String?
+  deadline        DateTime?
+  priority        TaskPriority @default(NORMAL)
+  status          TaskStatus   @default(ASSIGNED)
+  notes           String?
+  assignedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+
+  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user            User     @relation("DocumentAssignee", fields: [userId], references: [id])
+  assignedBy      User     @relation("DocumentAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([documentId, userId])
+  @@index([documentId])
+  @@index([userId])
+  @@index([status])
+  @@index([deadline])
+  @@map("document_assignments")
+}
+
+// ============================================
+// TASK MODELS
+// ============================================
+
+model Task {
+  id              String       @id @default(uuid())
+  taskNumber      String       @unique
+  title           String
+  description     String?
+  categoryId      String?
+  departmentId    String?
+  relatedDocumentId String?    @unique
+  relatedReportId String?      @unique
+  startDate       DateTime?
+  deadline        DateTime?
+  priority        TaskPriority @default(NORMAL)
+  status          TaskStatus   @default(NOT_STARTED)
+  progress        Int          @default(0)
+  createdById     String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  completedAt     DateTime?
+  deletedAt       DateTime?
+
+  // Relations
+  category        Category?       @relation(fields: [categoryId], references: [id])
+  department      Department?     @relation(fields: [departmentId], references: [id])
+  relatedDocument Document?       @relation("TaskDocument", fields: [relatedDocumentId], references: [id])
+  relatedReport   Report?         @relation("TaskReport", fields: [relatedReportId], references: [id])
+  createdBy       User            @relation("TaskCreator", fields: [createdById], references: [id])
+  assignments     TaskAssignment[]
+  progressUpdates TaskProgress[]
+  comments        TaskComment[]
+  tags            TaskTag[]
+  attachments     TaskAttachment[]
+  dependencies    TaskDependency[] @relation("TaskDependency")
+  dependents      TaskDependency[] @relation("TaskDependent")
+
+  @@index([taskNumber])
+  @@index([categoryId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([priority])
+  @@index([deadline])
+  @@index([createdById])
+  @@index([createdAt])
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id          String     @id @default(uuid())
+  taskId      String
+  userId      String
+  assignedById String
+  assignedAt  DateTime   @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  isPrimary   Boolean    @default(false)
+
+  task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User       @relation("TaskAssignee", fields: [userId], references: [id])
+  assignedBy  User       @relation("TaskAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+  @@map("task_assignments")
+}
+
+model TaskProgress {
+  id          String   @id @default(uuid())
+  taskId      String
+  userId      String
+  progress    Int
+  updateText  String
+  createdAt   DateTime @default(now())
+
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User     @relation("TaskProgressUser", fields: [userId], references: [id])
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("task_progress")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation("TaskCommentUser", fields: [userId], references: [id])
+
+  @@index([taskId])
+  @@index([userId])
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id          String   @id @default(uuid())
+  taskId      String
+  fileName    String
+  fileSize    BigInt
+  mimeType    String
+  filePath    String
+  uploadedById String
+  createdAt   DateTime @default(now())
+
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy  User     @relation("TaskAttachmentUploader", fields: [uploadedById], references: [id])
+
+  @@index([taskId])
+  @@index([uploadedById])
+  @@map("task_attachments")
+}
+
+model TaskDependency {
+  id           String   @id @default(uuid())
+  taskId       String
+  dependsOnId  String
+  type         String   @default("BLOCKS") // BLOCKS, RELATES_TO
+  createdAt    DateTime @default(now())
+
+  task         Task     @relation("TaskDependency", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn    Task     @relation("TaskDependent", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnId])
+  @@index([taskId])
+  @@index([dependsOnId])
+  @@map("task_dependencies")
+}
+
+// ============================================
+// REPORT MODELS
+// ============================================
+
+model Report {
+  id              String       @id @default(uuid())
+  reportNumber    String       @unique
+  title           String
+  type            ReportType
+  categoryId      String?
+  authorId        String
+  subject         String?
+  summary         String?
+  content         String?
+  workCompleted   String?
+  results         String?
+  problems        String?
+  recommendations String?
+  statistics      String?
+  status          ReportStatus @default(DRAFT)
+  reportingMonth  Int?
+  reportingYear   Int?
+  relatedTaskId   String?      @unique
+  relatedDocumentId String?    @unique
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  submittedAt     DateTime?
+  finalizedAt     DateTime?
+  deletedAt       DateTime?
+
+  // Relations
+  category        Category?       @relation(fields: [categoryId], references: [id])
+  author          User            @relation("ReportAuthor", fields: [authorId], references: [id])
+  relatedTask     Task?           @relation("TaskReport")
+  relatedDocument Document?       @relation("ReportDocument", fields: [relatedDocumentId], references: [id])
+  attachments     ReportAttachment[]
+  reviews         ReportReview[]
+  tags            ReportTag[]
+
+  @@index([reportNumber])
+  @@index([type])
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([status])
+  @@index([reportingMonth, reportingYear])
+  @@index([relatedTaskId])
+  @@index([createdAt])
+  @@map("reports")
+}
+
+model ReportAttachment {
+  id          String   @id @default(uuid())
+  reportId    String
+  fileName    String
+  fileSize    BigInt
+  mimeType    String
+  filePath    String
+  uploadedById String
+  createdAt   DateTime @default(now())
+
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  uploadedBy  User     @relation("ReportAttachmentUploader", fields: [uploadedById], references: [id])
+
+  @@index([reportId])
+  @@index([uploadedById])
+  @@map("report_attachments")
+}
+
+model ReportReview {
+  id          String   @id @default(uuid())
+  reportId    String
+  reviewerId  String
+  status      ReportStatus
+  comments    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reviewer    User     @relation("ReportReviewer", fields: [reviewerId], references: [id])
+
+  @@index([reportId])
+  @@index([reviewerId])
+  @@index([status])
+  @@map("report_reviews")
+}
+
+// ============================================
+// CALENDAR & NOTIFICATION MODELS
+// ============================================
+
+model CalendarEvent {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  allDay      Boolean  @default(false)
+  type        String   @default("TASK") // TASK, MEETING, DEADLINE, REPORT, CUSTOM
+  relatedId   String?  // Task ID, Report ID, etc.
+  userId      String
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation("CalendarEventUser", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([startAt])
+  @@index([type])
+  @@map("calendar_events")
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
+  relatedId   String?
+  relatedType String? // TASK, DOCUMENT, REPORT, USER, SYSTEM
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ============================================
+// AUDIT & SYSTEM MODELS
+// ============================================
+
+model AuditLog {
+  id          String      @id @default(uuid())
+  userId      String?
+  action      AuditAction
+  targetType  String
+  targetId    String?
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+
+  user        User?       @relation("AuditLogUser", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  category    String   @default("GENERAL")
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+  updatedBy   User?    @relation("SystemSettingUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([category])
+  @@index([isPublic])
+  @@map("system_settings")
+}
+
+// ============================================
+// PERMISSION MODEL (for granular RBAC)
+// ============================================
+
+model Permission {
+  id          String   @id @default(uuid())
+  key         String   @unique // e.g., "documents.view", "tasks.create"
+  name        String
+  description String?
+  category    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@index([category])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String       @id @default(uuid())
+  role         UserRole
+  permissionId String
+  createdAt    DateTime     @default(now())
+
+  permission   Permission   @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@index([role])
+  @@map("role_permissions")
+}
