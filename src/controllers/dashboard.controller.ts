@@ -86,14 +86,14 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
   ])
 
   // Get category names for chart
-  const categoryIds = tasksByCategory.map(t => t.categoryId).filter(Boolean) as string[]
+  const categoryIds = tasksByCategory.map((t: { categoryId: string | null }) => t.categoryId).filter(Boolean) as string[]
   const categories = await prisma.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, name: true, color: true } })
-  const categoryMap = new Map(categories.map(c => [c.id, c]))
+  const categoryMap = new Map(categories.map((c: { id: string; name: string; color: string }) => [c.id, c]))
 
   // Get user names for workload
-  const userIds = userWorkload.map(u => u.userId)
+  const userIds = userWorkload.map((u: { userId: string }) => u.userId)
   const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } })
-  const userMap = new Map(users.map(u => [u.id, u.fullName]))
+  const userMap = new Map(users.map((u: { id: string; fullName: string }) => [u.id, u.fullName]))
 
   res.json({
     success: true,
@@ -112,24 +112,24 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
         approvedReports,
       },
       charts: {
-        tasksByStatus: tasksByStatus.map(t => ({ status: t.status, count: t._count.status })),
-        tasksByCategory: tasksByCategory.map(t => ({
+        tasksByStatus: tasksByStatus.map((t: { status: string; _count: { status: number } }) => ({ status: t.status, count: t._count.status })),
+        tasksByCategory: tasksByCategory.map((t: { categoryId: string | null; _count: { categoryId: number } }) => ({
           category: categoryMap.get(t.categoryId!)?.name || 'Unknown',
           color: categoryMap.get(t.categoryId!)?.color || '#6B7280',
           count: t._count.categoryId,
         })),
-        tasksByPriority: tasksByPriority.map(t => ({ priority: t.priority, count: t._count.priority })),
+        tasksByPriority: tasksByPriority.map((t: { priority: string; _count: { priority: number } }) => ({ priority: t.priority, count: t._count.priority })),
         monthlyActivity,
-        userWorkload: userWorkload.map(u => ({
+        userWorkload: userWorkload.map((u: { userId: string; activeTasks: number; completedTasks: number; overdueTasks: number }) => ({
           user: userMap.get(u.userId) || 'Unknown',
           activeTasks: u.activeTasks,
           completedTasks: u.completedTasks,
           overdueTasks: u.overdueTasks,
         })),
-        reportStats: reportStats.map(r => ({ status: r.status, count: r._count.status })),
+        reportStats: reportStats.map((r: { status: string; _count: { status: number } }) => ({ status: r.status, count: r._count.status })),
       },
       recent: {
-        tasks: recentTasks.map(t => ({
+        tasks: recentTasks.map((t: any) => ({
           id: t.id,
           taskNumber: t.taskNumber,
           title: t.title,
@@ -137,9 +137,9 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
           priority: t.priority,
           deadline: t.deadline,
           category: t.category,
-          assignees: t.assignments.map(a => a.user.fullName),
+          assignees: t.assignments.map((a: any) => a.user.fullName),
         })),
-        documents: recentDocuments.map(d => ({
+        documents: recentDocuments.map((d: any) => ({
           id: d.id,
           documentNumber: d.documentNumber,
           title: d.title,
@@ -149,7 +149,7 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
           uploadedBy: d.uploadedBy.fullName,
           createdAt: d.createdAt,
         })),
-        reports: recentReports.map(r => ({
+        reports: recentReports.map((r: any) => ({
           id: r.id,
           reportNumber: r.reportNumber,
           title: r.title,

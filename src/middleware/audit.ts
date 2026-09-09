@@ -22,7 +22,7 @@ export const createAuditLog = async (data: AuditLogData) => {
         action: data.action as any,
         targetType: data.targetType,
         targetId: data.targetId,
-        metadata: data.metadata,
+        metadata: data.metadata ?? Prisma.DbNull,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       },

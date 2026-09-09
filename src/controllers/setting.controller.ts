@@ -22,7 +22,7 @@ export const getSettings = async (req: AuthenticatedRequest, res: Response) => {
   })
 
   // Group by category
-  const grouped = settings.reduce((acc, setting) => {
+  const grouped = settings.reduce((acc: Record<string, any[]>, setting) => {
     if (!acc[setting.category]) acc[setting.category] = []
     acc[setting.category].push(setting)
     return acc
@@ -79,7 +79,7 @@ export const getPublicSettings = async (req: Request, res: Response) => {
     select: { key: true, value: true, description: true, category: true },
   })
 
-  const grouped = settings.reduce((acc, setting) => {
+  const grouped = settings.reduce((acc: Record<string, Record<string, any>>, setting) => {
     if (!acc[setting.category]) acc[setting.category] = {}
     acc[setting.category][setting.key] = setting.value
     return acc

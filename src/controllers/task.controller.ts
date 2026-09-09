@@ -29,7 +29,7 @@ async function canAccessTask(userId: string, userRole: string, taskId: string): 
 }
 
 // Helper: Update task status based on progress
-import { TaskStatus } from '@prisma/client'
+type TaskStatus = 'NOT_STARTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'WAITING' | 'COMPLETED' | 'CANCELLED' | 'OVERDUE'
 
 function getStatusFromProgress(progress: number, currentStatus: TaskStatus): TaskStatus {
   if (progress === 100) return 'COMPLETED'
@@ -320,7 +320,7 @@ export const updateTaskProgress = async (req: AuthenticatedRequest, res: Respons
 
   const newStatus = getStatusFromProgress(progress, task.status)
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     // Create progress update
     await tx.taskProgress.create({
       data: { taskId: id, userId: req.user!.id, progress, updateText },

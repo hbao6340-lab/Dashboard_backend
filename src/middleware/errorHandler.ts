@@ -1,8 +1,9 @@
 // Error Handler Middleware
 import { Request, Response, NextFunction } from 'express'
 import { ZodError } from 'zod'
-import { Prisma } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken'
+import env from '../config/env.js'
 
 export class AppError extends Error {
   constructor(
@@ -76,7 +77,7 @@ export const errorHandler = (
   }
 
   // Prisma errors
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+  if (err instanceof PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
       const field = (err.meta?.target as string[])?.join(', ') || 'field'
       return res.status(409).json({
@@ -127,6 +128,3 @@ export const errorHandler = (
     errorCode: 'INTERNAL_ERROR',
   })
 }
-
-// Import env at the top level for use in error handler
-import env from '../config/env.js'
