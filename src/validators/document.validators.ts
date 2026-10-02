@@ -51,7 +51,8 @@ export const assignDocumentSchema = z.object({
     responsibility: z.string().optional(),
     instructions: z.string().optional(),
     deadline: z.string().datetime().optional(),
-    priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).default('NORMAL'),
+    // 3 priority levels: Thấp (LOW) / Trung bình (NORMAL) / Cao (HIGH)
+    priority: z.enum(['LOW', 'NORMAL', 'HIGH']).default('NORMAL'),
     notes: z.string().optional(),
   }),
 })

@@ -93,9 +93,16 @@ export const getUser = async (req: AuthenticatedRequest, res: Response) => {
 }
 
 export const createUser = async (req: AuthenticatedRequest, res: Response) => {
-  if (req.user!.role !== 'DEVELOPER') throw new AuthorizationError('Only developers can create users')
+  if (!['DEVELOPER', 'ADMINISTRATOR'].includes(req.user!.role)) {
+    throw new AuthorizationError('Only administrators and developers can create users')
+  }
 
   const { username, email, password, fullName, role, departmentId, position, phone } = req.body
+
+  // Administrators cannot create developer accounts
+  if (req.user!.role === 'ADMINISTRATOR' && role === 'DEVELOPER') {
+    throw new AuthorizationError('Only developers can create developer accounts')
+  }
 
   const existing = await prisma.user.findFirst({ where: { OR: [{ username }, { email }] } })
   if (existing) throw new ConflictError('Username or email already exists')

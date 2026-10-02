@@ -9,7 +9,8 @@ export const getTasksSchema = z.object({
     categoryId: z.string().uuid().optional(),
     departmentId: z.string().uuid().optional(),
     status: z.enum(['NOT_STARTED', 'ASSIGNED', 'IN_PROGRESS', 'WAITING', 'COMPLETED', 'CANCELLED', 'OVERDUE']).optional(),
-    priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).optional(),
+    // 3 priority levels: Thấp (LOW) / Trung bình (NORMAL) / Cao (HIGH)
+    priority: z.enum(['LOW', 'NORMAL', 'HIGH']).optional(),
     assignedToId: z.string().uuid().optional(),
     createdById: z.string().uuid().optional(),
     sortBy: z.string().default('createdAt'),
@@ -31,7 +32,8 @@ export const createTaskSchema = z.object({
     relatedReportId: z.string().uuid().optional(),
     startDate: z.string().datetime().optional(),
     deadline: z.string().datetime().optional(),
-    priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).default('NORMAL'),
+    // 3 priority levels: Thấp (LOW) / Trung bình (NORMAL) / Cao (HIGH)
+    priority: z.enum(['LOW', 'NORMAL', 'HIGH']).default('NORMAL'),
     assigneeIds: z.array(z.string().uuid()).optional(),
   }),
 })
@@ -47,7 +49,8 @@ export const updateTaskSchema = z.object({
     relatedReportId: z.string().uuid().nullable().optional(),
     startDate: z.string().datetime().nullable().optional(),
     deadline: z.string().datetime().nullable().optional(),
-    priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).optional(),
+    // 3 priority levels: Thấp (LOW) / Trung bình (NORMAL) / Cao (HIGH)
+    priority: z.enum(['LOW', 'NORMAL', 'HIGH']).optional(),
     status: z.enum(['NOT_STARTED', 'ASSIGNED', 'IN_PROGRESS', 'WAITING', 'COMPLETED', 'CANCELLED', 'OVERDUE']).optional(),
     progress: z.coerce.number().min(0).max(100).optional(),
   }),

@@ -89,24 +89,34 @@ export const requireRole = (...allowedRoles: string[]) => {
 }
 
 // Permission-based authorization middleware
-export const requirePermission = (permission: string) => {
+export const requirePermission = (permissionKey: string) => {
   return async (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     if (!req.user) {
       throw new AuthenticationError('Authentication required')
     }
 
-    // Check if user's role has the required permission
+    // Look up permission by key, then check role assignment.
+    // (RolePermission stores permissionId UUID, not the key string.)
+    const permission = await prisma.permission.findUnique({
+      where: { key: permissionKey },
+      select: { id: true },
+    })
+
+    if (!permission) {
+      throw new AuthorizationError(`Permission required: ${permissionKey}`)
+    }
+
     const rolePermission = await prisma.rolePermission.findUnique({
       where: {
         role_permissionId: {
           role: req.user.role as any,
-          permissionId: permission,
+          permissionId: permission.id,
         },
       },
     })
 
     if (!rolePermission) {
-      throw new AuthorizationError(`Permission required: ${permission}`)
+      throw new AuthorizationError(`Permission required: ${permissionKey}`)
     }
 
     next()

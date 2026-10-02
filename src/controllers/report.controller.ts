@@ -4,6 +4,41 @@ import { prisma } from '../config/prisma.js'
 import { AuthenticatedRequest } from '../middleware/auth.js'
 import { audit } from '../middleware/audit.js'
 import { AppError, NotFoundError, AuthorizationError } from '../middleware/errorHandler.js'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs'
+import { v4 as uuidv4 } from 'uuid'
+import env from '../config/env.js'
+
+// Multer config for report attachments (doc, docx, pdf, xls, xlsx, txt, jpg, png, zip)
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const uploadDir = env.UPLOAD_DIR
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+    cb(null, uploadDir)
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname)
+    cb(null, `${uuidv4()}${ext}`)
+  },
+})
+
+const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedTypes = env.ALLOWED_MIME_TYPES.split(',')
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true)
+  } else {
+    cb(new AppError('File type not allowed. Allowed: doc, docx, pdf, xls, xlsx, txt, jpg, png, zip', 400, 'INVALID_FILE_TYPE'))
+  }
+}
+
+export const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: env.MAX_FILE_SIZE },
+})
 
 // Helper: Generate report number
 async function generateReportNumber(): Promise<string> {
@@ -278,6 +313,63 @@ export const getReportReviews = async (req: AuthenticatedRequest, res: Response)
   })
 
   res.json({ success: true, data: { reviews } })
+}
+
+export const uploadReportAttachment = async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params
+  const file = req.file
+
+  if (!file) throw new AppError('No file uploaded', 400, 'NO_FILE')
+
+  const report = await prisma.report.findUnique({ where: { id } })
+  if (!report) throw new NotFoundError('Report')
+
+  const hasAccess = await canAccessReport(req.user!.id, req.user!.role, id)
+  if (!hasAccess) throw new AuthorizationError('You do not have permission to attach files to this report')
+
+  const attachment = await prisma.reportAttachment.create({
+    data: {
+      reportId: id,
+      fileName: file.originalname,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+      filePath: file.filename,
+      uploadedById: req.user!.id,
+    },
+    include: { uploadedBy: { select: { id: true, username: true, fullName: true } } },
+  })
+
+  res.status(201).json({ success: true, message: 'Tệp đính kèm đã được tải lên', data: { attachment } })
+}
+
+export const getReportAttachments = async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params
+
+  const hasAccess = await canAccessReport(req.user!.id, req.user!.role, id)
+  if (!hasAccess) throw new AuthorizationError('You do not have permission to view this report')
+
+  const attachments = await prisma.reportAttachment.findMany({
+    where: { reportId: id },
+    orderBy: { createdAt: 'desc' },
+    include: { uploadedBy: { select: { id: true, username: true, fullName: true } } },
+  })
+
+  res.json({ success: true, data: { attachments } })
+}
+
+export const downloadReportAttachment = async (req: AuthenticatedRequest, res: Response) => {
+  const { id, attachmentId } = req.params
+
+  const attachment = await prisma.reportAttachment.findUnique({ where: { id: attachmentId } })
+  if (!attachment || attachment.reportId !== id) throw new NotFoundError('Attachment')
+
+  const hasAccess = await canAccessReport(req.user!.id, req.user!.role, id)
+  if (!hasAccess) throw new AuthorizationError('You do not have permission to download this attachment')
+
+  const filePath = path.join(env.UPLOAD_DIR, attachment.filePath)
+  if (!fs.existsSync(filePath)) throw new NotFoundError('File')
+
+  res.download(filePath, attachment.fileName)
 }
 
 async function createAuditLog(data: any) {

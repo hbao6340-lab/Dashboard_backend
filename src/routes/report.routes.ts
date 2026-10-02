@@ -10,6 +10,10 @@ import {
   submitReport,
   reviewReport,
   getReportReviews,
+  uploadReportAttachment,
+  getReportAttachments,
+  downloadReportAttachment,
+  upload,
 } from '../controllers/report.controller.js'
 import {
   getReportsSchema,
@@ -34,5 +38,10 @@ router.delete('/:id', deleteReport)
 router.post('/:id/submit', validate(submitReportSchema), submitReport)
 router.post('/:id/review', requireRole('ADMINISTRATOR', 'DEVELOPER'), validate(reviewReportSchema), reviewReport)
 router.get('/:id/reviews', getReportReviews)
+
+// Report attachments (doc, docx, pdf, ...)
+router.post('/:id/attachments', requirePermission('reports.create'), upload.single('file'), uploadReportAttachment)
+router.get('/:id/attachments', getReportAttachments)
+router.get('/:id/attachments/:attachmentId/download', downloadReportAttachment)
 
 export default router

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "E-Office Backend API",
   "main": "dist/index.js",
+  "engines": { "node": ">=20.0.0" },
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",

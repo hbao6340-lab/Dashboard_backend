@@ -376,12 +376,14 @@ export const assignDocument = async (req: AuthenticatedRequest, res: Response) =
 
   // Create calendar event if deadline
   if (deadline) {
+    const deadlineDate = new Date(deadline)
+    // Event on the assignee's calendar
     await prisma.calendarEvent.create({
       data: {
         title: `Document Deadline: ${document.title}`,
         description: instructions || responsibility,
-        startAt: new Date(deadline),
-        endAt: new Date(deadline),
+        startAt: deadlineDate,
+        endAt: deadlineDate,
         allDay: true,
         type: 'DEADLINE',
         relatedId: id,
@@ -389,6 +391,22 @@ export const assignDocument = async (req: AuthenticatedRequest, res: Response) =
         color: '#EF4444',
       },
     })
+    // Mirror event on the assigner's (admin) calendar so both sides see it
+    if (req.user!.id !== userId) {
+      await prisma.calendarEvent.create({
+        data: {
+          title: `Đã giao: ${document.title} → ${user.fullName || user.username}`,
+          description: instructions || responsibility,
+          startAt: deadlineDate,
+          endAt: deadlineDate,
+          allDay: true,
+          type: 'DEADLINE',
+          relatedId: id,
+          userId: req.user!.id,
+          color: '#F59E0B',
+        },
+      })
+    }
   }
 
   // Audit log

@@ -5,16 +5,32 @@ import { AuthenticatedRequest } from '../middleware/auth.js'
 import { AppError, NotFoundError, AuthorizationError } from '../middleware/errorHandler.js'
 
 export const getCalendarEvents = async (req: AuthenticatedRequest, res: Response) => {
-  const { start, end, type } = req.query
+  const { start, end, type, userId } = req.query as { start?: string; end?: string; type?: string; userId?: string }
+  const isPrivileged = ['DEVELOPER', 'ADMINISTRATOR'].includes(req.user!.role)
 
-  const where: any = { userId: req.user!.id }
-  if (start) where.startAt = { gte: new Date(start as string) }
-  if (end) where.endAt = { lte: new Date(end as string) }
+  const where: any = {}
+  // Regular users only see their own events; admins/developers see all
+  // (optionally filtered by userId) so document deadlines assigned to users
+  // are visible on the admin calendar as well.
+  if (!isPrivileged) {
+    where.userId = req.user!.id
+  } else if (userId) {
+    where.userId = userId
+  }
+  if (start || end) {
+    where.startAt = {}
+    if (start) where.startAt.gte = new Date(start)
+    if (end) where.startAt.lte = new Date(end)
+  }
+  if (end && !start) {
+    where.endAt = { lte: new Date(end) }
+  }
   if (type) where.type = type
 
   const events = await prisma.calendarEvent.findMany({
     where,
     orderBy: { startAt: 'asc' },
+    include: { user: { select: { id: true, username: true, fullName: true } } },
   })
 
   res.json({ success: true, data: { events } })
