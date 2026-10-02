@@ -27,6 +27,12 @@ import auditRoutes from './routes/audit.routes.js'
 
 const app = express()
 
+// Prisma returns BigInt for file sizes, which JSON.stringify cannot serialize.
+// Convert BigInt to Number in all JSON responses (safe: file sizes are tiny
+// compared to Number.MAX_SAFE_INTEGER). Without this, every document /
+// attachment response crashes with "Do not know how to serialize a BigInt".
+app.set('json replacer', (_key: string, value: unknown) => (typeof value === 'bigint' ? Number(value) : value))
+
 // Trust proxy for correct IP detection behind reverse proxy
 app.set('trust proxy', 1)
 
