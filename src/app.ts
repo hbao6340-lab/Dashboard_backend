@@ -37,8 +37,16 @@ app.use(helmet({
 }))
 
 // CORS configuration
+// CORS_ORIGIN may be a single URL or a comma-separated list, e.g.
+// "https://dashboard-frontend-iota-indol.vercel.app,https://preview-x.vercel.app"
+const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
 app.use(cors({
-  origin: env.CORS_ORIGIN,
+  origin: (origin, callback) => {
+    // Allow same-origin / non-browser requests (no Origin header)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    return callback(new Error(`CORS blocked for origin: ${origin}`))
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

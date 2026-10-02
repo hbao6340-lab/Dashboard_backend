@@ -33,13 +33,17 @@ const generateTokens = (user: { id: string; username: string; email: string; rol
 }
 
 // Set auth cookies
+// Production frontend (Vercel) and backend (Railway) are cross-site, so
+// cookies must use SameSite=None + Secure or the browser will not send them
+// on API requests and every authenticated call returns 401.
+const cookieSameSite = (env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax'
 const setAuthCookies = (res: Response, accessToken: string, refreshToken: string, rememberMe: boolean) => {
   const maxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : env.SESSION_MAX_AGE // 30 days or session max age
 
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: cookieSameSite,
     maxAge,
     path: '/',
   })
@@ -47,16 +51,18 @@ const setAuthCookies = (res: Response, accessToken: string, refreshToken: string
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: cookieSameSite,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     path: '/',
   })
 }
 
-// Clear auth cookies
+// Clear auth cookies (flags must match how they were set, otherwise the
+// browser keeps the SameSite=None cookie)
 const clearAuthCookies = (res: Response) => {
-  res.clearCookie('accessToken', { path: '/' })
-  res.clearCookie('refreshToken', { path: '/' })
+  const opts = { path: '/', sameSite: cookieSameSite, secure: env.NODE_ENV === 'production' } as const
+  res.clearCookie('accessToken', opts)
+  res.clearCookie('refreshToken', opts)
 }
 
 export const login = async (req: Request, res: Response) => {
