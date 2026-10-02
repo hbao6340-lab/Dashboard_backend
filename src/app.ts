@@ -83,6 +83,15 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// Build info endpoint (which commit is actually running)
+app.get('/version', (_req, res) => {
+  res.json({
+    commit: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
+    nodeEnv: env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  })
+})
+
 // API routes
 const apiPrefix = env.API_PREFIX
 
