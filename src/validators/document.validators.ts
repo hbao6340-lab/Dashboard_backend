@@ -66,3 +66,15 @@ export const createDocumentVersionSchema = z.object({
     changeNotes: z.string().optional(),
   }),
 })
+
+export const assignAllDocumentSchema = z.object({
+  params: z.object({ id: z.string().uuid() }),
+  body: z.object({
+    responsibility: z.string().optional(),
+    instructions: z.string().optional(),
+    deadline: z.string().datetime().optional(),
+    // 3 mức độ ưu tiên: Thấp (LOW) / Trung bình (NORMAL) / Cao (HIGH)
+    priority: z.enum(['LOW', 'NORMAL', 'HIGH']).default('NORMAL'),
+    notes: z.string().optional(),
+  }),
+})

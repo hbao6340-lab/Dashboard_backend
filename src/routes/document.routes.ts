@@ -9,6 +9,7 @@ import {
   deleteDocument,
   downloadDocument,
   assignDocument,
+  assignDocumentToAll,
   getDocumentAssignments,
   updateDocumentAssignment,
   createDocumentVersion,
@@ -21,6 +22,7 @@ import {
   createDocumentSchema,
   updateDocumentSchema,
   assignDocumentSchema,
+  assignAllDocumentSchema,
   createDocumentVersionSchema,
 } from '../validators/document.validators.js'
 import { authMiddleware, requirePermission } from '../middleware/auth.js'
@@ -41,6 +43,7 @@ router.get('/:id/download', requirePermission('documents.download'), downloadDoc
 // Document Assignments
 router.get('/:id/assignments', getDocumentAssignments)
 router.post('/:id/assign', requirePermission('documents.assign'), validate(assignDocumentSchema), assignDocument)
+router.post('/:id/assign-all', requirePermission('documents.assign'), validate(assignAllDocumentSchema), assignDocumentToAll)
 router.patch('/:id/assignments/:assignmentId', updateDocumentAssignment)
 
 // Document Versions

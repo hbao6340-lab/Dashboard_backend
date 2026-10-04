@@ -437,6 +437,114 @@ export const getDocumentAssignments = async (req: AuthenticatedRequest, res: Res
   res.json({ success: true, data: { assignments } })
 }
 
+// Assign a document to EVERYONE (all active USER + ADMINISTRATOR accounts).
+// Used when a work document requires the whole unit's participation.
+export const assignDocumentToAll = async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params
+  const { responsibility, instructions, deadline, priority, notes } = req.body
+
+  const document = await prisma.document.findUnique({ where: { id } })
+  if (!document) {
+    throw new NotFoundError('Document')
+  }
+
+  // Same permission rule as single assignment
+  if (!['DEVELOPER', 'ADMINISTRATOR'].includes(req.user!.role) && document.uploadedById !== req.user!.id) {
+    throw new AuthorizationError('You do not have permission to assign this document')
+  }
+
+  const deadlineDate = deadline ? new Date(deadline) : null
+
+  // Everyone = all active USER and ADMINISTRATOR accounts (skip system developer)
+  const everyone = await prisma.user.findMany({
+    where: { status: 'ACTIVE', deletedAt: null, role: { in: ['USER', 'ADMINISTRATOR'] } },
+    select: { id: true, username: true, fullName: true },
+  })
+
+  let assigned = 0
+  for (const target of everyone) {
+    await prisma.documentAssignment.upsert({
+      where: { documentId_userId: { documentId: id, userId: target.id } },
+      create: {
+        documentId: id,
+        userId: target.id,
+        responsibility,
+        instructions,
+        deadline: deadlineDate,
+        priority,
+        notes,
+        assignedById: req.user!.id,
+      },
+      update: {
+        responsibility,
+        instructions,
+        deadline: deadlineDate,
+        priority,
+        notes,
+        assignedById: req.user!.id,
+        status: 'ASSIGNED',
+      },
+    })
+
+    await prisma.notification.create({
+      data: {
+        userId: target.id,
+        type: 'DOCUMENT_ASSIGNED',
+        title: 'Văn bản được giao cho tất cả',
+        message: `Văn bản "${document.title}" được giao cho tất cả mọi người${deadline ? `, hạn xử lý: ${new Date(deadline).toLocaleDateString('vi-VN')}` : ''}`,
+        relatedId: id,
+        relatedType: 'DOCUMENT',
+      },
+    })
+
+    if (deadlineDate) {
+      await prisma.calendarEvent.create({
+        data: {
+          title: `Hạn xử lý: ${document.title}`,
+          description: instructions || responsibility,
+          startAt: deadlineDate,
+          endAt: deadlineDate,
+          allDay: true,
+          type: 'DEADLINE',
+          relatedId: id,
+          userId: target.id,
+          color: '#EF4444',
+        },
+      })
+    }
+    assigned++
+  }
+
+  // Mirror event on the assigner's calendar
+  if (deadlineDate) {
+    await prisma.calendarEvent.create({
+      data: {
+        title: `Đã giao cho tất cả: ${document.title} (${assigned} người)`,
+        description: instructions || responsibility,
+        startAt: deadlineDate,
+        endAt: deadlineDate,
+        allDay: true,
+        type: 'DEADLINE',
+        relatedId: id,
+        userId: req.user!.id,
+        color: '#F59E0B',
+      },
+    })
+  }
+
+  await createAuditLog({
+    userId: req.user!.id,
+    action: 'TASK_ASSIGNED',
+    targetType: 'DOCUMENT',
+    targetId: id,
+    metadata: { assignAll: true, count: assigned, deadline },
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+  })
+
+  res.json({ success: true, message: `Đã giao văn bản cho tất cả (${assigned} người)`, data: { assigned } })
+}
+
 export const updateDocumentAssignment = async (req: AuthenticatedRequest, res: Response) => {
   const { id, assignmentId } = req.params
   const { status, notes } = req.body
