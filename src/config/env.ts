@@ -27,6 +27,16 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(15 * 60 * 1000), // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
 
+  // Outgoing email (optional — notification emails are skipped when unset).
+  // Gmail example: host smtp.gmail.com, port 587, user your address,
+  // pass an App Password (Google Account > Security > 2-Step Verification >
+  // App passwords), NOT your normal password.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().default('"Đoàn Tân Hưng (no-reply)" <no-reply@tanhung.vn>'),
+
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
 
   BCRYPT_ROUNDS: z.coerce.number().default(12),

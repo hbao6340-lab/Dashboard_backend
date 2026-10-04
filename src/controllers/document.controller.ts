@@ -4,6 +4,7 @@ import { prisma } from '../config/prisma.js'
 import { AuthenticatedRequest } from '../middleware/auth.js'
 import { audit } from '../middleware/audit.js'
 import { AppError, NotFoundError, AuthorizationError } from '../middleware/errorHandler.js'
+import { notifyUser } from '../services/notification.service.js'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
@@ -362,16 +363,14 @@ export const assignDocument = async (req: AuthenticatedRequest, res: Response) =
     include: { user: { select: { id: true, username: true, fullName: true, email: true } } },
   })
 
-  // Create notification
-  await prisma.notification.create({
-    data: {
-      userId,
-      type: 'DOCUMENT_ASSIGNED',
-      title: 'Document Assigned',
-      message: `You have been assigned to document: ${document.title}`,
-      relatedId: id,
-      relatedType: 'DOCUMENT',
-    },
+  // Create in-app notification + email mirror
+  await notifyUser({
+    userId,
+    type: 'DOCUMENT_ASSIGNED',
+    title: 'Document Assigned',
+    message: `You have been assigned to document: ${document.title}`,
+    relatedId: id,
+    relatedType: 'DOCUMENT',
   })
 
   // Create calendar event if deadline
@@ -486,15 +485,13 @@ export const assignDocumentToAll = async (req: AuthenticatedRequest, res: Respon
       },
     })
 
-    await prisma.notification.create({
-      data: {
-        userId: target.id,
-        type: 'DOCUMENT_ASSIGNED',
-        title: 'Văn bản được giao cho tất cả',
-        message: `Văn bản "${document.title}" được giao cho tất cả mọi người${deadline ? `, hạn xử lý: ${new Date(deadline).toLocaleDateString('vi-VN')}` : ''}`,
-        relatedId: id,
-        relatedType: 'DOCUMENT',
-      },
+    await notifyUser({
+      userId: target.id,
+      type: 'DOCUMENT_ASSIGNED',
+      title: 'Văn bản được giao cho tất cả',
+      message: `Văn bản "${document.title}" được giao cho tất cả mọi người${deadline ? `, hạn xử lý: ${new Date(deadline).toLocaleDateString('vi-VN')}` : ''}`,
+      relatedId: id,
+      relatedType: 'DOCUMENT',
     })
 
     if (deadlineDate) {

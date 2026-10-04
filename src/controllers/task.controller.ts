@@ -4,6 +4,7 @@ import { prisma } from '../config/prisma.js'
 import { AuthenticatedRequest } from '../middleware/auth.js'
 import { audit } from '../middleware/audit.js'
 import { AppError, NotFoundError, AuthorizationError } from '../middleware/errorHandler.js'
+import { notifyUser } from '../services/notification.service.js'
 
 // Helper: Generate task number
 async function generateTaskNumber(): Promise<string> {
@@ -38,11 +39,9 @@ function getStatusFromProgress(progress: number, currentStatus: TaskStatus): Tas
   return currentStatus
 }
 
-// Helper: Create notification
+// Helper: Create in-app notification + email mirror
 async function createNotification(userId: string, type: any, title: string, message: string, relatedId: string, relatedType: string) {
-  await prisma.notification.create({
-    data: { userId, type, title, message, relatedId, relatedType },
-  })
+  await notifyUser({ userId, type, title, message, relatedId, relatedType })
 }
 
 export const getTasks = async (req: AuthenticatedRequest, res: Response) => {
