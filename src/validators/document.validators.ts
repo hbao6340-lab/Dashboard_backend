@@ -1,15 +1,18 @@
 // Document Validators
 import { z } from 'zod'
 
+// Query strings often arrive as "" for "no filter" — treat them as absent.
+const emptyToUndefined = (v: unknown) => (v === '' ? undefined : v)
+
 export const getDocumentsSchema = z.object({
   query: z.object({
     page: z.coerce.number().positive().default(1),
     limit: z.coerce.number().positive().max(100).default(20),
-    search: z.string().optional(),
-    categoryId: z.string().uuid().optional(),
-    status: z.enum(['DRAFT', 'SUBMITTED', 'ACTIVE', 'IN_PROGRESS', 'COMPLETED', 'ARCHIVED']).optional(),
-    type: z.enum(['PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'PPT', 'PPTX', 'TXT', 'JPG', 'JPEG', 'PNG', 'ZIP', 'OTHER']).optional(),
-    uploadedById: z.string().uuid().optional(),
+    search: z.preprocess(emptyToUndefined, z.string().optional()),
+    categoryId: z.preprocess(emptyToUndefined, z.string().uuid().optional()),
+    status: z.preprocess(emptyToUndefined, z.enum(['DRAFT', 'SUBMITTED', 'ACTIVE', 'IN_PROGRESS', 'COMPLETED', 'ARCHIVED']).optional()),
+    type: z.preprocess(emptyToUndefined, z.enum(['PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'PPT', 'PPTX', 'TXT', 'JPG', 'JPEG', 'PNG', 'ZIP', 'OTHER']).optional()),
+    uploadedById: z.preprocess(emptyToUndefined, z.string().uuid().optional()),
     sortBy: z.string().default('createdAt'),
     sortOrder: z.enum(['asc', 'desc']).default('desc'),
   }),
