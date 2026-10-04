@@ -147,6 +147,56 @@ async function main() {
 
   console.log('✅ KP users created (kp1.tanhung - kp35.tanhung)')
 
+  // Additional live accounts (affiliated units) — exact credentials per provided table
+  const EXTRA_LIVE_USERS: Array<{ username: string; password: string }> = [
+    { username: 'gvmntk.tanhung', password: 'Tanhung.Gvmntk' },
+    { username: 'gvmmth.tanhung', password: 'Tanhung.Gvmmth' },
+    { username: 'gvmntp.tanhung', password: 'Tanhung.Gvmntp' },
+    { username: 'gvthltv.tanhung', password: 'Tanhung.Gvthltv' },
+    { username: 'gvthtvts.tanhung', password: 'Tanhung.Gvthtvts' },
+    { username: 'gvthth.tanhung', password: 'Tanhung.Gvthth' },
+    { username: 'gvthcsnht.tanhung', password: 'Tanhung.Gvthcsnht' },
+    { username: 'gvthcstqt.tanhung', password: 'Tanhung.Gvthcstqt' },
+    { username: 'gvthcsntt.tanhung', password: 'Tanhung.Gvthcsntt' },
+    { username: 'thptltt.tanhung', password: 'Tanhung.Thptltt' },
+    { username: 'thpttp.tanhung', password: 'Tanhung.Thpttp' },
+    { username: 'gvthptltt.tanhung', password: 'Tanhung.Gvthptltt' },
+    { username: 'gvthptpp.tanhung', password: 'Tanhung.Gvthptpp' },
+    { username: 'cap.tanhung', password: 'Tanhung.Cap' },
+    { username: 'dq.tanhung', password: 'Tanhung.Dq' },
+    { username: 'tyt.tanhung', password: 'Tanhung.Tyt' },
+    { username: 'th.tanhung', password: 'Tanhung.Th' },
+    { username: 'hpg.tanhung', password: 'Tanhung.Hpg' },
+    { username: 'dkth.tanhung', password: 'Tanhung.Dkth' },
+    { username: 'viettopia.tanhung', password: 'Tanhung.Viettopia' },
+    { username: 'mshoa.tanhung', password: 'Tanhung.Mshoa' },
+    { username: 'qthg.tanhung', password: 'Tanhung.Qthg' },
+    { username: 'ubnd.tanhung', password: 'Tanhung.Ubnd' },
+    { username: 'ttcu.tanhung', password: 'Tanhung.Ttcu' },
+    { username: 'cqd.tanhung', password: 'Tanhung.Cqd' },
+  ]
+
+  for (const extra of EXTRA_LIVE_USERS) {
+    const passwordHash = await argon2.hash(extra.password)
+    const prefix = extra.username.split('.')[0]
+    await prisma.user.upsert({
+      where: { username: extra.username },
+      update: { passwordHash, status: 'ACTIVE', role: 'USER', deletedAt: null, departmentId: departments[5].id },
+      create: {
+        username: extra.username,
+        email: `${extra.username}@tanhung.local`,
+        passwordHash,
+        fullName: `${prefix.toUpperCase()} Tân Hưng`,
+        role: 'USER',
+        status: 'ACTIVE',
+        departmentId: departments[5].id,
+        position: 'Đơn vị phối hợp',
+      },
+    })
+  }
+
+  console.log(`✅ Extra live accounts created (${EXTRA_LIVE_USERS.length} affiliated units)`)
+
   // Retire old demo accounts (admin, admin2, user001-user070) if present
   const legacyUsernames: string[] = ['admin', 'admin2']
   for (let i = 1; i <= 70; i++) {
@@ -260,6 +310,7 @@ async function main() {
   console.log('   Developer: developer / password123')
   console.log('   Admin: bithu.tanhung / Tanhung.Bithu')
   console.log('   Users: kp1.tanhung - kp35.tanhung / Tanhung.Kp1 - Tanhung.Kp35')
+  console.log('   Extra: gvmntk/gvmmth/gvmntp/gvthltv/gvthtvts/gvthth/gvthcsnht/gvthcstqt/gvthcsntt/thptltt/thpttp/gvthptltt/gvthptpp, cap/dq/tyt/th/hpg/dkth/viettopia/mshoa/qthg/ubnd/ttcu/cqd (.tanhung / per-table passwords)')
 }
 
 main()
