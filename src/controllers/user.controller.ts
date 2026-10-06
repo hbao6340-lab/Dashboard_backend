@@ -92,12 +92,54 @@ export const getUser = async (req: AuthenticatedRequest, res: Response) => {
   res.json({ success: true, data: { user } })
 }
 
+// Find a department by name (case-insensitive) or create it.
+// Lets admins — and users editing their own profile — type a unit name
+// as free text instead of picking from a fixed list.
+async function findOrCreateDepartmentByName(name: string) {
+  const trimmed = name.trim()
+  const existing = await prisma.department.findFirst({
+    where: { name: { equals: trimmed, mode: 'insensitive' } },
+  })
+  if (existing) return existing
+
+  const slug = trimmed
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 18) || 'UNIT'
+
+  let code = slug
+  let n = 2
+  while (await prisma.department.findUnique({ where: { code } })) {
+    code = `${slug}_${n++}`.slice(0, 30)
+  }
+
+  try {
+    return await prisma.department.create({
+      data: { name: trimmed, code, description: 'Tự tạo từ thông tin người dùng' },
+    })
+  } catch (e: any) {
+    // Lost a race with a concurrent create — fetch the winner instead
+    if (e?.code === 'P2002') {
+      const winner = await prisma.department.findFirst({
+        where: { name: { equals: trimmed, mode: 'insensitive' } },
+      })
+      if (winner) return winner
+    }
+    throw e
+  }
+}
+
 export const createUser = async (req: AuthenticatedRequest, res: Response) => {
   if (!['DEVELOPER', 'ADMINISTRATOR'].includes(req.user!.role)) {
     throw new AuthorizationError('Only administrators and developers can create users')
   }
 
-  const { username, email, password, fullName, role, departmentId, position, phone } = req.body
+  const { username, email, password, fullName, role, departmentId, departmentName, position, phone } = req.body
 
   // Administrators cannot create developer accounts
   if (req.user!.role === 'ADMINISTRATOR' && role === 'DEVELOPER') {
@@ -109,6 +151,12 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
 
   const passwordHash = await argon2.hash(password)
 
+  // Free-text department: match existing or create it
+  let resolvedDepartmentId = departmentId as string | undefined
+  if (typeof departmentName === 'string' && departmentName.trim() !== '') {
+    resolvedDepartmentId = (await findOrCreateDepartmentByName(departmentName)).id
+  }
+
   const user = await prisma.user.create({
     data: {
       username,
@@ -116,7 +164,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       passwordHash,
       fullName,
       role: role || 'USER',
-      departmentId,
+      departmentId: resolvedDepartmentId,
       position,
       phone,
       createdById: req.user!.id,
@@ -131,7 +179,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
 
 export const updateUser = async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params
-  const { fullName, email, role, departmentId, position, phone, status } = req.body
+  const { fullName, email, role, departmentId, departmentName, position, phone, status } = req.body
 
   const targetUser = await prisma.user.findUnique({ where: { id } })
   if (!targetUser) throw new NotFoundError('User')
@@ -146,7 +194,7 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response) => {
     // Regular users may only touch their own profile, and only safe fields.
     // (Without this, any user could escalate themselves to ADMINISTRATOR.)
     if (req.user!.id !== id) throw new AuthorizationError('You can only update your own profile')
-    const allowedFields = ['fullName', 'phone', 'email']
+    const allowedFields = ['fullName', 'phone', 'email', 'position', 'departmentName']
     const requestedFields = Object.keys(req.body)
     const hasDisallowed = requestedFields.some(f => !allowedFields.includes(f))
     if (hasDisallowed) throw new AuthorizationError('You can only update your profile information')
@@ -158,9 +206,17 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response) => {
     if (existing) throw new ConflictError('Email already in use')
   }
 
+  // Free-text department: non-empty name matches or creates, '' clears it
+  let resolvedDepartmentId = departmentId as string | null | undefined
+  if (typeof departmentName === 'string') {
+    resolvedDepartmentId = departmentName.trim() === ''
+      ? null
+      : (await findOrCreateDepartmentByName(departmentName)).id
+  }
+
   const updated = await prisma.user.update({
     where: { id },
-    data: { fullName, email, role, departmentId, position, phone, status, updatedById: req.user!.id },
+    data: { fullName, email, role, departmentId: resolvedDepartmentId, position, phone, status, updatedById: req.user!.id },
     select: { id: true, username: true, email: true, fullName: true, role: true, status: true, departmentId: true, position: true, phone: true },
   })
 
