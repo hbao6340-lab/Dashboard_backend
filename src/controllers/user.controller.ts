@@ -142,14 +142,14 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response) => {
     if (role && role === 'DEVELOPER') throw new AuthorizationError('Cannot assign developer role')
   }
 
-  if (req.user!.role !== 'DEVELOPER' && req.user!.id !== id) {
-    // Users can only update their own profile (limited fields)
-    if (req.user!.role !== 'ADMINISTRATOR') {
-      const allowedFields = ['fullName', 'phone']
-      const requestedFields = Object.keys(req.body)
-      const hasDisallowed = requestedFields.some(f => !allowedFields.includes(f))
-      if (hasDisallowed) throw new AuthorizationError('You can only update your profile information')
-    }
+  if (req.user!.role === 'USER') {
+    // Regular users may only touch their own profile, and only safe fields.
+    // (Without this, any user could escalate themselves to ADMINISTRATOR.)
+    if (req.user!.id !== id) throw new AuthorizationError('You can only update your own profile')
+    const allowedFields = ['fullName', 'phone', 'email']
+    const requestedFields = Object.keys(req.body)
+    const hasDisallowed = requestedFields.some(f => !allowedFields.includes(f))
+    if (hasDisallowed) throw new AuthorizationError('You can only update your profile information')
   }
 
   // Check email uniqueness
