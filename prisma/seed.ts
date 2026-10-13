@@ -12,6 +12,7 @@ const WORK_CATEGORIES = [
   { name: 'Chuyển đổi số trong công tác Đoàn', description: 'Ứng dụng công nghệ và chuyển đổi số', color: '#06B6D4', sortOrder: 4 },
   { name: 'Đội & Thiếu nhi', description: 'Công tác Đội và phong trào thiếu nhi', color: '#EC4899', sortOrder: 5 },
   { name: 'Hội Liên hiệp Thanh niên Việt Nam', description: 'Công tác Hội LHTN Việt Nam', color: '#10B981', sortOrder: 6 },
+  { name: 'Thông Báo', description: 'Thông báo chung của đơn vị', color: '#EA580C', sortOrder: 7 },
 ]
 
 async function main() {
