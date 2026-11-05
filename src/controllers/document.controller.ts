@@ -56,6 +56,9 @@ async function canAccessDocument(userId: string, userRole: string, documentId: s
   // Developer and Admin can access all
   if (['DEVELOPER', 'ADMINISTRATOR'].includes(userRole)) return true
 
+  // Non-classified documents are visible to every account
+  if (!['CONFIDENTIAL', 'RESTRICTED'].includes(doc.confidentiality ?? 'INTERNAL')) return true
+
   // Uploader can access
   if (doc.uploadedById === userId) return true
 
@@ -81,19 +84,27 @@ export const getDocuments = async (req: AuthenticatedRequest, res: Response) => 
 
   const where: any = { deletedAt: null }
 
-  // Role-based filtering
+  // Role-based filtering: regular users see non-classified documents plus
+  // anything uploaded by them or assigned to them (even classified ones).
   if (!['DEVELOPER', 'ADMINISTRATOR'].includes(req.user!.role)) {
-    where.OR = [
-      { uploadedById: req.user!.id },
-      { assignments: { some: { userId: req.user!.id } } },
+    where.AND = [
+      { confidentiality: { notIn: ['CONFIDENTIAL', 'RESTRICTED'] } },
+      { OR: [{ uploadedById: req.user!.id }, { assignments: { some: { userId: req.user!.id } } }, {}] },
     ]
   }
 
   if (search) {
-    where.OR = [
+    const accessible: any[] = [
       { title: { contains: search as string, mode: 'insensitive' } },
       { documentNumber: { contains: search as string, mode: 'insensitive' } },
       { description: { contains: search as string, mode: 'insensitive' } },
+      { uploadedById: req.user!.id },
+      { assignments: { some: { userId: req.user!.id } } },
+    ]
+    accessible.push({} as any)
+    where.AND = [
+      ...(where.AND || []),
+      { OR: accessible },
     ]
   }
   if (categoryId) where.categoryId = categoryId
